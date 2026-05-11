@@ -2,6 +2,7 @@
 /.build
 /Packages
 /dist
+/release
 /Support/AppIcon-base.png
 /Support/AppIcon.icns
 /Support/AppIcon.iconset
