@@ -14,10 +14,15 @@ final class InputLockMonitor: ObservableObject {
     @Published private(set) var launchAtLoginAvailable = true
     @Published private(set) var isPaused: Bool
     @Published private(set) var launchAtLoginEnabled: Bool
+    @Published private(set) var isKeyboardCleaningModeEnabled = false
+    @Published private(set) var keyboardCleaningStatusText = "已关闭"
+    @Published private(set) var keyboardCleaningNeedsAttention = false
+    @Published private(set) var canOpenKeyboardPrivacySettings = false
 
     private let settingsStore: InputLockSettingsStore
     private let inputSourceController: InputSourceControlling
     private let loginItemController: LaunchAtLoginControlling
+    private let keyboardCleaningController: KeyboardCleaningLockController
     private let resolver = TargetInputSourceResolver()
 
     private var engine: InputLockEngine
@@ -29,12 +34,14 @@ final class InputLockMonitor: ObservableObject {
     init(
         settingsStore: InputLockSettingsStore = InputLockSettingsStore(),
         inputSourceController: InputSourceControlling = CarbonInputSourceController(),
-        loginItemController: LaunchAtLoginControlling = MainAppLoginItemController()
+        loginItemController: LaunchAtLoginControlling = MainAppLoginItemController(),
+        keyboardCleaningController: KeyboardCleaningLockController = KeyboardCleaningLockController()
     ) {
         let settings = settingsStore.load()
         self.settingsStore = settingsStore
         self.inputSourceController = inputSourceController
         self.loginItemController = loginItemController
+        self.keyboardCleaningController = keyboardCleaningController
         engine = InputLockEngine(
             targetInputSourceID: settings.targetInputSourceID,
             isPaused: settings.isPaused
@@ -49,6 +56,15 @@ final class InputLockMonitor: ObservableObject {
 
             self.handleInputSourceChanged(descriptor)
         }
+
+        keyboardCleaningController.onStateChanged = { [weak self] state in
+            guard let self else {
+                return
+            }
+
+            self.applyKeyboardCleaningState(state)
+        }
+        applyKeyboardCleaningState(keyboardCleaningController.state)
 
         inputSourceController.start()
         launchAtLoginAvailable = loginItemController.isAvailable
@@ -101,6 +117,20 @@ final class InputLockMonitor: ObservableObject {
         updateMenuBarPresentation()
     }
 
+    func setKeyboardCleaningModeEnabled(_ enabled: Bool) {
+        keyboardCleaningController.setEnabled(enabled)
+        updateStatusText()
+        updateMenuBarPresentation()
+    }
+
+    func openKeyboardPrivacySettings() {
+        keyboardCleaningController.openPrivacySettings()
+    }
+
+    func openKeyboardAccessibilitySettings() {
+        keyboardCleaningController.openAccessibilitySettings()
+    }
+
     private func applySettings(_ settings: InputLockSettings) {
         let previousPendingToken = engine.pendingCorrectionToken
         engine.applySettings(settings)
@@ -108,6 +138,16 @@ final class InputLockMonitor: ObservableObject {
         launchAtLoginEnabled = settings.launchAtLoginEnabled
         persistSettings()
         syncScheduledCorrection(previousPendingToken: previousPendingToken)
+    }
+
+    private func applyKeyboardCleaningState(_ state: KeyboardCleaningLockState) {
+        isKeyboardCleaningModeEnabled = state.isEnabled
+        keyboardCleaningStatusText = state.statusText
+        keyboardCleaningNeedsAttention = state.needsAttention
+        canOpenKeyboardPrivacySettings = state.canOpenPrivacySettings
+
+        updateStatusText()
+        updateMenuBarPresentation()
     }
 
     private func persistSettings() {
@@ -265,6 +305,11 @@ final class InputLockMonitor: ObservableObject {
     }
 
     private func updateStatusText() {
+        if isKeyboardCleaningModeEnabled || keyboardCleaningNeedsAttention {
+            statusText = keyboardCleaningStatusText
+            return
+        }
+
         if isPaused {
             statusText = "已暂停"
             return
@@ -289,12 +334,16 @@ final class InputLockMonitor: ObservableObject {
     }
 
     private func updateMenuBarPresentation() {
-        if isPaused {
+        if isKeyboardCleaningModeEnabled {
+            menuBarSymbolName = "lock.fill"
+        } else if keyboardCleaningNeedsAttention {
+            menuBarSymbolName = "exclamationmark.triangle"
+        } else if isPaused {
             menuBarSymbolName = "pause.circle"
         } else if targetDescriptor == nil {
             menuBarSymbolName = "exclamationmark.triangle"
         } else if currentInputSourceID == engine.targetInputSourceID {
-            menuBarSymbolName = "lock.circle"
+            menuBarSymbolName = "target"
         } else {
             menuBarSymbolName = "keyboard"
         }

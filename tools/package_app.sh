@@ -10,6 +10,7 @@ APP_DIR="$DIST_DIR/$APP_NAME.app"
 ICON_BASE="$ROOT_DIR/Support/AppIcon-base.png"
 ICONSET_DIR="$ROOT_DIR/Support/AppIcon.iconset"
 ICNS_PATH="$ROOT_DIR/Support/AppIcon.icns"
+CODE_SIGN_REQUIREMENT='=designated => identifier "local.vigor.InputLockBar"'
 
 cd "$ROOT_DIR"
 
@@ -38,6 +39,6 @@ cp "$BUILD_DIR/release/$APP_NAME" "$APP_DIR/Contents/MacOS/$APP_NAME"
 cp "$ICNS_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
 chmod +x "$APP_DIR/Contents/MacOS/$APP_NAME"
 
-codesign --force --deep --sign - "$APP_DIR" >/dev/null
+codesign --force --deep --sign - --requirements "$CODE_SIGN_REQUIREMENT" "$APP_DIR" >/dev/null
 
 echo "Packaged $APP_DIR"
