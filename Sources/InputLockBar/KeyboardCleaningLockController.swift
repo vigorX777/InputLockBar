@@ -79,9 +79,12 @@ final class KeyboardCleaningLockController: @unchecked Sendable {
             return
         }
 
+        // Media, brightness, playback, and Caps Lock controls arrive as NX_SYSDEFINED (14).
+        let systemDefinedEventMask = CGEventMask(1 << 14)
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
             | CGEventMask(1 << CGEventType.keyUp.rawValue)
             | CGEventMask(1 << CGEventType.flagsChanged.rawValue)
+            | systemDefinedEventMask
 
         guard let tap = createEventTap(mask: mask) ?? requestPermissionsAndRetry(mask: mask) else {
             state = KeyboardCleaningLockState(
